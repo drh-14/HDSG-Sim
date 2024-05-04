@@ -5,7 +5,6 @@ import random
 
 #Network of Agents
 class AgentNetwork:
-    
     agentSet, graphSet = [], []
     data1, data2, data3,iter = [], [], [], [] #Data points for SGP, PSG, and HDSG plot(x-axis is iterations, y-axis is function value)
     def __init__(self, agents):
@@ -13,12 +12,16 @@ class AgentNetwork:
     
     #Initialize edge set, in-neighbor sets, out-neighbor sets
     def initializeSets(self):
-      if len(self.agentSet) > 1:
-       for i in range(0,len(self.agentSet) - 1):
-          for j in range(i,len(self.agentSet)):
-            self.graphSet.append((self.agentSet[i],self.agentSet[j]))
-            self.agentSet[i].addToOutSet(self.agentSet[j])
-            self.agentSet[j].addToInSet(self.agentSet[i])
+      self.iter.append(0)
+      self.data1.append(1)
+      self.data2.append(1)
+      self.data3.append(1)
+      if len(self.agentSet) > 0:
+       for i in self.agentSet:
+          for j in self.agentSet:
+            self.graphSet.append((i,j))
+            i.addToInSet(j)
+            i.addToOutSet(j)
       else:
          raise IndexError('Must have at least two agents.')
     
@@ -26,85 +29,71 @@ class AgentNetwork:
        self.agentSet.append(x)
 
     #Positive, nonincreasing, square summable but not summable step size choice
-    def stepsizeFunc(self,x):
-       if x == 0:
-          return 0
-       return 1/(x ** 2) 
+    def calculateStepSize(self,t):
+       return 1/(t ** 2) 
        
     #Subgradient-Push Algorithm
     def SGP(self, iterations):
-      for i in range(0,iterations):
+      for i in range(1,iterations + 1):
          self.iter.append(i)
-         sum_X,sum_Y = 0, 0
          for j in self.agentSet:
-            if j.getOutSetSize() == 0:
-               weight = 1
-            else:
-               weight = 1/j.getOutSetSize()
-            j.updateGradient(j.getX() / j.getY())
+            sumX,sumY = 0, 0
             for k in j.OSet:
-               sum_X = sum_X + weight * (j.getX() -
-                self.stepsizeFunc(i) * j.updateGradient(j.getX() /
-               j.getY()))
-               sum_Y = sum_Y + k.updateY(weight * j.getY())
-            j.updateX(sum_X)
-            j.updateY(sum_Y)
-         self.data1.append(self.costFunction(j.getX))
+               weight = 1/k.getOutSetSize()
+               sumX += weight * (j.getX() - self.calculateStepSize(i) * k.getGradient())
+               sumY += weight * k.getY()
+               k.updateGradient(j.getX() / j.getY())
+            j.setX(sumX)
+            j.setY(sumY)
+         self.data1.append(self.costFunction(j.getX()))
+      print(self.data1)
       
-
     #Push-Subgradient Algorithm
     def PSG(self,iterations):
-      for i in range(0,iterations):
-         self.iter.append(i)
-         sumX,sumY = 0, 0
+      for i in range(1,iterations + 1):
          for j in self.agentSet:
-            j.updateGradient(j.getX() / j.getY())
-            if j.getOutSetSize() == 0:
-               weight = 1
-            else:
-               weight = 1/j.getOutSetSize()
-            for k in j.OSet:
-               k.updateGradient(k.getX() / k.getY())
-               sumX = sumX + weight * k.getX() - (self.stepsizeFunc(i) * k.getGradient())
-               sumY = sumY + k.updateY(weight * j.getY())
-               k.updateGradient(k.getX() / k.getY()) 
-            j.updateX(sumX)
-            j.updateY(sumY)
+            sumX,sumY = 0,0
+            for k in j.ISet:
+               weight = 1/k.getOutSetSize()
+               sumX += (weight * k.getX()) - (self.calculateStepSize(i) * j.getGradient())
+               sumY += weight * k.getY()
+            j.setX(sumX)
+            j.setY(sumY)
+            j.updateGradient(j.getX() / j.getY()) 
          self.data2.append(self.costFunction(j.getX()))
       print(self.data2)
-      
+
     #Heterogeneous Distributed Subgradient Algorithm
     def HDSG(self,iterations):
-       for i in range(0,iterations):
-          AgentNetwork.iter.append(i)
-          sum_X,sum_Y = 0, 0
+       for i in range(1,iterations + 1):
           for j in self.agentSet:
+             sumX,sumY = 0, 0
              j.updateGradient(j.getX() / j.getY())
              switchSignal = j.determineSwitch()
              weight = 1/j.getOutSetSize()
              for k in j.OSet:
                k.updateGradient(k.getX() /k.getY())
-               sum_X = sum_X + weight * (k.getX() - k.getFunction() * 
-               k.getGradient() * switchSignal) - AgentNetwork.agentSet[k] * j.getGradient()
-               (1 - switchSignal)
-               sum_Y = sum_Y + weight * k.getY()
+               sumX += weight * (k.getX() - self.calculateStepSize(i) * k.getGradient() * switchSignal)
+               - (self.calculateStepSize(i) * j.getGradient() * (1 - switchSignal))
+               sumY += weight * k.getGradient()
+          j.setX(sumX)
+          j.setY(sumY)
+          self.data3.append(j.getX())
      
      #Calculate global cost function
     def costFunction(self,x):
       sum = 0
       for a in self.agentSet:
-         f = a.getFunction()
-         sum = sum + f(x)
+         sum += a.getFunction()(x)
       return sum / len(self.agentSet)
     
 #Agent with private cost function
 class Agent():
-    ISet, OSet, switch = None,None,[]
-    x_current, y_current, grad = 1,1,0
+    ISet, OSet, switch, x_current, y_current = [],[],0,5,1
+    grad = 0
     def __init__(self,func):
         self.func = func
-        self.ISet = []
-        self.OSet = []
+        self.updateGradient(self.x_current/self.y_current)
  
     #Returns the agent's cost function
     def getFunction(self):
@@ -133,13 +122,11 @@ class Agent():
     def getOutSetSize(self):
        return len(self.OSet)
 
-    def updateX(self,k):
+    def setX(self,k):
        self.x_current = k
-       return k
     
-    def updateY(self,k):
+    def setY(self,k):
        self.y_current = k
-       return self.y_current
     
     def getX(self):
        return self.x_current
@@ -148,8 +135,8 @@ class Agent():
        return self.y_current
     
     def updateGradient(self,x):
-       self.grad = (self.useFunction(x) - self.useFunction(x + 0.00000025)) / 0.00000025
-    
+       self.grad = (self.useFunction(x + 0.00005) - self.useFunction(x))/(0.00005)
+
     def getGradient(self):
        return self.grad
     
@@ -165,22 +152,21 @@ class Agent():
     def getSwitch():
        return Agent.switch
 
-agent1 = Agent(np.sqrt)
-agent2 = Agent(np.sqrt)
-agent3 = Agent(np.square)
-agent4 = Agent(np.cbrt)
-agent5 = Agent(np.log2)
-a = AgentNetwork([agent1, agent2, agent3, agent4, agent5])
-a.initializeSets()
-a.PSG(5)
+agent1 = Agent(np.square)
+agent2 = Agent(np.cos)
+agent3 = Agent(np.sinc)
+agent4 = Agent(np.sin)
+tNetwork = AgentNetwork([agent1,agent2,agent3,agent4])
+tNetwork.initializeSets()   
+tNetwork.SGP(50)
+tNetwork.PSG(50)
+tNetwork.HDSG(50)
+plt.plot(tNetwork.iter,tNetwork.data1, 'red')
+plt.plot(tNetwork.iter,tNetwork.data2, 'green')
+plt.plot(tNetwork.iter,tNetwork.data3, 'blue')
 
-   
-   
-   
+plt.show()
       
-   
-       
-
         
 
 
