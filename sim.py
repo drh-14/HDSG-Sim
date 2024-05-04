@@ -46,7 +46,6 @@ class AgentNetwork:
             j.setX(sumX)
             j.setY(sumY)
          self.data1.append(self.costFunction(j.getX()))
-      print(self.data1)
       
     #Push-Subgradient Algorithm
     def PSG(self,iterations):
@@ -61,7 +60,6 @@ class AgentNetwork:
             j.setY(sumY)
             j.updateGradient(j.getX() / j.getY()) 
          self.data2.append(self.costFunction(j.getX()))
-      print(self.data2)
 
     #Heterogeneous Distributed Subgradient Algorithm
     def HDSG(self,iterations):
@@ -76,9 +74,9 @@ class AgentNetwork:
                sumX += weight * (k.getX() - self.calculateStepSize(i) * k.getGradient() * switchSignal)
                - (self.calculateStepSize(i) * j.getGradient() * (1 - switchSignal))
                sumY += weight * k.getGradient()
-          j.setX(sumX)
-          j.setY(sumY)
-          self.data3.append(j.getX())
+             j.setX(sumX)
+             j.setY(sumY)
+          self.data3.append(self.costFunction(j.getX()))
      
      #Calculate global cost function
     def costFunction(self,x):
@@ -89,7 +87,7 @@ class AgentNetwork:
     
 #Agent with private cost function
 class Agent():
-    ISet, OSet, switch, x_current, y_current = [],[],0,5,1
+    ISet, OSet, switch, x_current, y_current = [],[],0,1,1
     grad = 0
     def __init__(self,func):
         self.func = func
@@ -152,19 +150,23 @@ class Agent():
     def getSwitch():
        return Agent.switch
 
-agent1 = Agent(np.square)
-agent2 = Agent(np.cos)
-agent3 = Agent(np.sinc)
-agent4 = Agent(np.sin)
-tNetwork = AgentNetwork([agent1,agent2,agent3,agent4])
+agent1 = Agent(np.poly1d([1,0]))
+agent2 = Agent(np.poly1d([1,0,0]))
+agent3 = Agent(np.poly1d([1,0,1]))
+agent4 = Agent(np.poly1d([2,5,0]))
+agent5 = Agent(np.poly1d([5,-7]))
+tNetwork = AgentNetwork([agent1,agent2,agent3,agent4,agent5])
 tNetwork.initializeSets()   
-tNetwork.SGP(50)
-tNetwork.PSG(50)
-tNetwork.HDSG(50)
-plt.plot(tNetwork.iter,tNetwork.data1, 'red')
-plt.plot(tNetwork.iter,tNetwork.data2, 'green')
-plt.plot(tNetwork.iter,tNetwork.data3, 'blue')
-
+tNetwork.SGP(20)
+tNetwork.PSG(20)
+tNetwork.HDSG(20)
+plt.title('SGP,PSG,HDSG Plot')
+plt.xlabel('Iterations')
+plt.ylabel('Function Value')
+plt.plot(tNetwork.iter,tNetwork.data1, 'red',label='Subgradient-Push')
+plt.plot(tNetwork.iter,tNetwork.data2, 'green',label='Push-Subgradient')
+plt.plot(tNetwork.iter,tNetwork.data3, 'blue',label='Heterogeneous Distributed Subgradient')
+plt.legend(loc="upper left")
 plt.show()
       
         
