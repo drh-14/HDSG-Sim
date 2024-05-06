@@ -66,16 +66,17 @@ class AgentNetwork:
        for i in range(1,iterations + 1):
           for j in self.agentSet:
              sumX,sumY = 0, 0
-             switch1 = j.determineSwitch()
              for k in j.OSet:
                weight = 1/k.getOutSetSize()
-               switch2 = k.determineSwitch()
-               k.updateGradient(k.getX() /k.getY())
-               sumX += weight * (k.getX() - (self.calculateStepSize(i) * k.getGradient() * switch2))
-               - (self.calculateStepSize(i) * j.getGradient() * (1 - switch1))
-               sumY += weight * k.getGradient()
-               j.updateGradient(j.getX() / j.getY())
-               k.updateGradient(k.getX() /k.getY())
+               k.setSwitch(k.determineSwitch())
+               if k.getSwitch() == 0:
+                  sumX += (weight * k.getX()) - (self.calculateStepSize(i) * j.getGradient())
+                  sumY += weight * k.getY()
+                  j.updateGradient(j.getX() / j.getY()) 
+               else:
+                  k.updateGradient(k.getX() / k.getY())
+                  sumX += weight * (k.getX() - self.calculateStepSize(i) * k.getGradient())
+                  sumY += weight * k.getY()
              j.setX(sumX)
              j.setY(sumY)
           self.data3.append(self.costFunction(j.getX()))
@@ -94,6 +95,7 @@ class Agent():
     def __init__(self,func):
         self.func = func
         self.updateGradient(self.x_current/self.y_current)
+        self.switch = self.determineSwitch()
  
     #Returns the agent's cost function
     def getFunction(self):
@@ -144,29 +146,35 @@ class Agent():
     def determineSwitch(self):
        randNum = random.randint(1,100)
        if randNum <= 50:
-          Agent.switch = 0
+          self.switch = 0
        else:
-          Agent.switch = 1
-       return Agent.switch
+          self.switch = 1
+       return self.switch
+    
+    def getSwitch(self):
+       return self.switch
+    
+    def setSwitch(self,k):
+       self.switch = k
 
-agent1 = Agent(np.poly1d([1,0]))
+agent1 = Agent(np.poly1d([1,1,0]))
 agent2 = Agent(np.poly1d([1,0,0]))
 agent3 = Agent(np.poly1d([1,0,1]))
-agent4 = Agent(np.poly1d([2,5,0]))
-agent5 = Agent(np.poly1d([5,-7]))
+agent4 = Agent(np.poly1d([1,5,0]))
+agent5 = Agent(np.poly1d([1,5,-7]))
+agent6 = Agent(np.square)
 tNetwork = AgentNetwork([agent1,agent2,agent3,agent4,agent5])
 tNetwork.initializeSets()   
 tNetwork.SGP(100)
 tNetwork.PSG(100)    
 tNetwork.HDSG(100) 
-plt.title('SGP,PSG,HDSG Plot')
+fig,axs = plt.subplots(3)
+fig.suptitle('SGP,PSG,HDSG Plots')
 plt.xlabel('Iterations')
 plt.ylabel('Function Value')
-plt.ylim((-10,10))
-plt.plot(tNetwork.iter,tNetwork.data1,'red',label='Subgradient-Push')
-plt.plot(tNetwork.iter,tNetwork.data2,'green',label='Push-Subgradient')
-plt.plot(tNetwork.iter,tNetwork.data3,'blue',label='Heterogeneous Subgradient')
-plt.legend(loc="upper right")
+axs[0].plot(tNetwork.iter,tNetwork.data1,'red')
+axs[1].plot(tNetwork.iter,tNetwork.data2,'green')
+axs[2].plot(tNetwork.iter,tNetwork.data3,'blue')
 plt.show()
       
 
